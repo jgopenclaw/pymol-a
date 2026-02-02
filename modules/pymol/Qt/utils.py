@@ -223,7 +223,7 @@ def connectFontContextMenu(widget):
             if ok:
                 widget.setFont(font)
 
-        menu.exec_(widget.mapToGlobal(pt))
+        menu.exec(widget.mapToGlobal(pt))
 
 
 def getSaveFileNameWithExt(*args, **kwargs):
