@@ -115,6 +115,8 @@ if PYQT_NAME.endswith('6'):
     copy_attributes(QtWidgets.QMainWindow, QtWidgets.QMainWindow.DockOption)
     copy_attributes(QtWidgets.QOpenGLWidget, QtOpenGLWidgets.QOpenGLWidget.UpdateBehavior)
     copy_attributes(QtWidgets.QSizePolicy, QtWidgets.QSizePolicy.Policy)
+    copy_attributes(QtWidgets.QFrame, QtWidgets.QFrame.Shadow)
+    copy_attributes(QtWidgets.QFrame, QtWidgets.QFrame.Shape)
     copy_attributes(QtWidgets.QTreeWidgetItem, QtWidgets.QTreeWidgetItem.ChildIndicatorPolicy)
 
     QtCore.Qt.MidButton = QtCore.Qt.MiddleButton
