@@ -49,6 +49,10 @@ Z* -------------------------------------------------------------------
 #include "Feedback.h"
 #include "Util2.h"
 
+#ifdef _PYMOL_IP_PROPERTIES
+#include "Property.h"
+#endif
+
 #ifdef _WEBGL
 #endif
 
@@ -6557,6 +6561,23 @@ int const* ObjectMolecule::getNeighborArray() const
 
 /*========================================================================*/
 #ifndef _PYMOL_NOPY
+#ifdef _PYMOL_IP_PROPERTIES
+static void copy_and_trim_repr(char* dest, PyObject* obj)
+{
+  PyObject* repr = PyObject_Repr(obj);
+  const char* src = PyString_AS_STRING(obj);
+  int srclen;
+  if (src[0] == '\'')
+    src++;
+  srclen = strlen(src);
+  if (src[srclen - 1] == '\'')
+    srclen -= 1;
+  strncpy(dest, src, srclen);
+  dest[srclen] = 0;
+  Py_DECREF(repr);
+}
+#endif
+
 static CoordSet *ObjectMoleculeChemPyModel2CoordSet(PyMOLGlobals * G,
                                                     PyObject * model,
                                                     AtomInfoType ** atInfoPtr)
@@ -7183,6 +7204,31 @@ static CoordSet *ObjectMoleculeChemPyModel2CoordSet(PyMOLGlobals * G,
     cset->TmpBond = pymol::vla_take_ownership(bond);
 
 #ifdef _PYMOL_IP_PROPERTIES
+    {
+      PyObject *propList = nullptr, *propName, *propValue, *propKeyValue;
+      OrthoLineType nameString;
+      int nProps = 0;
+
+      // need to check since fragments and other molecules use unpickle
+      // and pml files might not have molecule_properties
+      if (PyObject_HasAttrString(model, "molecule_properties")) {
+        propList = PyObject_GetAttrString(model, "molecule_properties");
+        if (propList && PyList_Check(propList))
+          nProps = PyList_Size(propList);
+        else
+          ok = ErrMessage(G, __func__, "can't get molecule properties");
+      }
+      if (nProps) {
+        for (a = 0; a < nProps; a++) {
+          propKeyValue = PyList_GetItem(propList, a);
+          propName = PyList_GetItem(propKeyValue, 0);
+          propValue = PyList_GetItem(propKeyValue, 1);
+          copy_and_trim_repr(nameString, propName);
+          PropertySet(G, cset, nameString, propValue);
+        }
+      }
+      Py_XDECREF(propList);
+    }
 #endif
   } else {
     VLAFreeP(bond);
@@ -7572,8 +7618,94 @@ ok_except1:
 
 /*========================================================================*/
 
+#ifdef _PYMOL_IP_PROPERTIES
+static char* sdl_mol_prop_name(const char* prop, short* isprop)
+{
+  int i, j, len;
+  char* name = nullptr;
+
+  /* for now, need to handle all special characters */
+  if (strchr(prop, '/') || strchr(prop, '\\')) {
+    if (isprop)
+      *isprop = false;
+    name = (char*) strdup(prop);
+    return name;
+  }
+  /* Rule 1: If <prop>, return substring between angle brackets */
+  for (i = 0; i < strlen(prop); i++) {
+    if (prop[i] == '<') {
+      for (len = 0, j = i + 1; j < strlen(prop); j++) {
+        if (prop[j] == '>') {
+          len = j - i - 1; /* change to j-i+1  to keep <> */
+          name = (char*) malloc(len + 1);
+          strncpy(name, prop + i + 1, len); /* change to prop+i to keep <> */
+          name[len] = '\0';
+          if (isprop)
+            *isprop = true;
+          return name;
+        }
+      }
+    }
+  }
+
+  /* Rule 2: Else if prop contains DT\d+, return that. */
+  for (i = 0; i < strlen(prop); i++) {
+    if (prop[i] == 'D' && prop[i + 1] == 'T' && isdigit(prop[i + 2])) {
+      for (len = 0, j = i + 3; j < strlen(prop); j++) {
+        if (!isdigit(prop[j])) {
+          len = j - i;
+          name = (char*) malloc(len + 1);
+          strncpy(name, prop + i, len);
+          name[len] = '\0';
+          if (isprop)
+            *isprop = true;
+          return name;
+        }
+      }
+    }
+  }
+
+  /* Rule 3: Else, strip [ribs]_*_ prefix itself. */
+  for (i = 0; i < strlen(prop); i++) {
+    if (prop[i] == '_') {
+      for (j = i + 1; j < strlen(prop); j++) {
+        if (prop[j] == '_') {
+          name = (char*) malloc(strlen(prop + j + 1) + 1);
+          strcpy(name, prop + j + 1);
+          if (isprop)
+            *isprop = true;
+          return name;
+        }
+      }
+    }
+  }
+
+  /* Rule 4: else return prop itself */
+  if (isprop)
+    *isprop = false;
+  name = (char*) strdup(prop);
+  return name;
+}
+
+static short is_sdl_mol_prop_name(const char* prop)
+{
+  short isprop;
+  char* cctmp = pymol::malloc<char>(strlen(prop) + 1);
+  strcpy(cctmp, prop);
+  free(sdl_mol_prop_name(cctmp, &isprop));
+  FreeP(cctmp);
+  return isprop;
+}
+#endif
+
+/*========================================================================*/
+
 static CoordSet *ObjectMoleculeMOLStr2CoordSet(PyMOLGlobals * G, const char *buffer,
-                                               AtomInfoType ** atInfoPtr, const char **restart)
+                                               AtomInfoType ** atInfoPtr, const char **restart
+#ifdef _PYMOL_IP_PROPERTIES
+                                               , short loadpropertiesall, OVLexicon *loadproplex
+#endif
+                                               )
 {
   const char *p;
   int nAtom, nBond;
@@ -7761,6 +7893,90 @@ static CoordSet *ObjectMoleculeMOLStr2CoordSet(PyMOLGlobals * G, const char *buf
     cset->NTmpBond = nBond;
     cset->TmpBond = pymol::vla_take_ownership(bond);
     strcpy(cset->Name, nameTmp);
+#ifdef _PYMOL_IP_PROPERTIES
+    p = nextline(p);
+    // Need to read in the properties
+    {
+      OVreturn_word ovresult;
+      const char* ptmp = p;
+      const char* np = ptmp;
+      char *cc = VLACalloc(char, 1024), *cctmp = VLACalloc(char, 1024);
+      int ccp = 0;
+      char* prop_name = nullptr;
+      short is_prop_name, line = 0;
+      int nchs;
+      cc[0] = 0;
+      ncopy(cctmp, np, 4);
+      cctmp[4] = 0;
+      while (strcmp(cctmp, "$$$$")) {
+        ptmp = np;
+        np = nextline(np);
+        if (np == ptmp)
+          break;
+        nchs = (np - ptmp - 1);
+        if (nchs) {
+          VLACheck(cctmp, char, nchs + 1);
+          ncopy(cctmp, ptmp, nchs);
+          cctmp[nchs] = 0;
+          is_prop_name = is_sdl_mol_prop_name(cctmp);
+          if (is_prop_name) {
+            // is_prop_name
+            if (prop_name) {
+              short load = loadpropertiesall;
+              if (!load && loadproplex) {
+                ovresult = OVLexicon_BorrowFromCString(loadproplex, prop_name);
+                load = (ovresult.status == OVstatus_SUCCESS);
+              }
+              if (load) {
+                PropertyCheckUniqueID(G, cset);
+                PropertySetromString(G, cset->prop_id, prop_name, cc);
+                ccp = 0;
+                cc[0] = 0;
+                line = 0;
+              }
+              free(prop_name);
+            }
+            prop_name = sdl_mol_prop_name(cctmp, nullptr);
+          } else {
+            if (prop_name) {
+              int sz = strlen(cctmp);
+              if (line == 1) {
+                VLACheck(cc, char, ccp + 2);
+                cc[ccp++] = '\n';
+              }
+              VLACheck(cc, char, ccp + sz + 2);
+              ncopy(&cc[ccp], cctmp, sz);
+              ccp += sz;
+              VLACheck(cc, char, ccp + 2);
+              if (line) {
+                cc[ccp++] = '\n';
+              }
+              cc[ccp] = 0;
+              line++;
+            }
+          }
+        }
+        ncopy(cctmp, np, 4);
+      }
+      if (prop_name) {
+        short load = loadpropertiesall;
+        if (!load && loadproplex) {
+          ovresult = OVLexicon_BorrowFromCString(loadproplex, prop_name);
+          load = (ovresult.status == OVstatus_SUCCESS);
+        }
+        if (load) {
+          PropertyCheckUniqueID(G, cset);
+          PropertySetromString(G, cset->prop_id, prop_name, cc);
+          ccp = 0;
+          cc[0] = 0;
+          line = 0;
+        }
+        free(prop_name);
+      }
+      VLAFreeP(cc);
+      VLAFreeP(cctmp);
+    }
+#endif
   } else {
     VLAFreeP(bond);
     VLAFreeP(coord);
@@ -7776,12 +7992,20 @@ static CoordSet *ObjectMoleculeMOLStr2CoordSet(PyMOLGlobals * G, const char *buf
 
 static CoordSet *ObjectMoleculeSDF2Str2CoordSet(PyMOLGlobals * G, const char *buffer,
                                                 AtomInfoType ** atInfoPtr,
-                                                const char **next_mol)
+                                                const char **next_mol
+#ifdef _PYMOL_IP_PROPERTIES
+                                                , short loadpropertiesall, OVLexicon *loadproplex
+#endif
+                                                )
 {
   char cc[MAXLINELEN];
   const char *p;
   CoordSet *result = nullptr;
-  result = ObjectMoleculeMOLStr2CoordSet(G, buffer, atInfoPtr, next_mol);
+  result = ObjectMoleculeMOLStr2CoordSet(G, buffer, atInfoPtr, next_mol
+#ifdef _PYMOL_IP_PROPERTIES
+      , loadpropertiesall, loadproplex
+#endif
+      );
   p = *next_mol;
   if(p) {
     while(*p) {                 /* we simply need to skip until we've read past the end of the SDF record */
@@ -8560,12 +8784,20 @@ ObjectMolecule *ObjectMoleculeReadStr(PyMOLGlobals * G, ObjectMolecule * I,
       break;
     case cLoadTypeMOL:
     case cLoadTypeMOLStr:
-      cset = ObjectMoleculeMOLStr2CoordSet(G, start, &atInfo, &restart);
+      cset = ObjectMoleculeMOLStr2CoordSet(G, start, &atInfo, &restart
+#ifdef _PYMOL_IP_PROPERTIES
+          , loadpropertiesall, loadproplex
+#endif
+          );
       restart = nullptr;
       break;
     case cLoadTypeSDF2:
     case cLoadTypeSDF2Str:
-      cset = ObjectMoleculeSDF2Str2CoordSet(G, start, &atInfo, &restart);
+      cset = ObjectMoleculeSDF2Str2CoordSet(G, start, &atInfo, &restart
+#ifdef _PYMOL_IP_PROPERTIES
+          , loadpropertiesall, loadproplex
+#endif
+          );
       break;
     case cLoadTypeXYZ:
     case cLoadTypeXYZStr:
@@ -11650,6 +11882,28 @@ CoordSet *ObjectMoleculeMMDStr2CoordSet(PyMOLGlobals * G, const char *buffer,
 #endif
 
 #ifdef _PYMOL_IP_PROPERTIES
+CPythonVal* ObjectMoleculeGetProperty(
+    ObjectMolecule* I, const char* propname, int state, int quiet)
+{
+  PyMOLGlobals* G = I->G;
+  for (StateIterator iter(G, I->Setting.get(), state, I->NCSet); iter.next();) {
+    if (I->CSet[iter.state])
+      return PropertyGetPyObject(G, I->CSet[iter.state], propname);
+  }
+  return nullptr;
+}
+
+int ObjectMoleculeSetProperty(ObjectMolecule* I, const char* propname,
+    CPythonVal* value, const PropertyType& proptype, int state, int quiet)
+{
+  int ok = true;
+  PyMOLGlobals* G = I->G;
+  for (StateIterator iter(G, I->Setting.get(), state, I->NCSet); iter.next();) {
+    if (I->CSet[iter.state])
+      ok &= PropertySet(G, I->CSet[iter.state], propname, value, proptype);
+  }
+  return (ok);
+}
 #endif
 
 void AtomInfoSettingGenerateSideEffects(PyMOLGlobals * G, ObjectMolecule *obj, int index, int id){

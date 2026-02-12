@@ -254,6 +254,11 @@ int CoordSetFromPyList(PyMOLGlobals * G, PyObject * list, CoordSet ** cs)
     }
 
 #ifdef _PYMOL_IP_PROPERTIES
+    if (ok && (ll > 9)) {
+      CPythonVal* val = CPythonVal_PyList_GetItem(G, list, 9);
+      I->prop_id = PropertyFromPyList(G, val);
+      CPythonVal_Free(val);
+    }
 #endif
 
     if(ok && (ll > 10)){
@@ -386,8 +391,9 @@ PyObject *CoordSetAsPyList(CoordSet * I)
 
     PyList_SetItem(result, 9,
 #ifdef _PYMOL_IP_PROPERTIES
+        I->prop_id ? PropertyAsPyList(G, I->prop_id, true) :
 #endif
-        PConvAutoNone(Py_None));
+                   PConvAutoNone(Py_None));
 
     if(I->SculptCGO) {
       PyList_SetItem(result, 10, CGOAsPyList(I->SculptCGO));
@@ -1133,6 +1139,19 @@ PyObject *CoordSetAtomToChemPyAtom(PyMOLGlobals * G, AtomInfoType * ai, ObjectMo
 
 
 #ifdef _PYMOL_IP_PROPERTIES
+    if (ai->prop_id) {
+      PyObject* props = PropertyAsPyList(G, ai->prop_id, false);
+      if (PyList_Check(props)) {
+        PyObject* atomProperties =
+            PyObject_GetAttrString(atom, "atom_properties");
+        int lp, lsz = PyList_Size(props);
+        for (lp = 0; lp < lsz; lp++) {
+          PyObject* atProp = PyList_GetItem(props, lp);
+          PyDict_SetItem(atomProperties, PyList_GetItem(atProp, 0),
+              PyList_GetItem(atProp, 1));
+        }
+      }
+    }
 #endif
 
   }
@@ -1530,6 +1549,10 @@ CoordSet::CoordSet(const CoordSet& cs)
   UtilZeroMem(this->Rep, sizeof(::Rep *) * cRepCnt);
 
 #ifdef _PYMOL_IP_PROPERTIES
+  if (cs.prop_id) {
+    PropertyCheckUniqueID(G, this);
+    PropertyCopyProperties(G, cs.prop_id, this->prop_id);
+  }
 #endif
 
 }
@@ -1627,6 +1650,10 @@ void CoordSet::enumIndices()
 CoordSet::~CoordSet()
 {
 #ifdef _PYMOL_IP_PROPERTIES
+  if (prop_id) {
+    PropertyUniqueDetachChain(G, prop_id);
+    prop_id = 0;
+  }
 #endif
 
   if (has_any_atom_state_settings()) {

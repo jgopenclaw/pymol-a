@@ -572,6 +572,7 @@ pymol_src_dirs = [
 def_macros = [
     ("_PYMOL_LIBPNG", None),
     ("_PYMOL_FREETYPE", None),
+    ("_PYMOL_IP_PROPERTIES", None),
 ]
 
 if DEBUG and not WIN:

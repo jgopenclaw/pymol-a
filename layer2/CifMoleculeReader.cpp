@@ -51,6 +51,7 @@
 #include "pocketfft_hdronly.h"
 
 #ifdef _PYMOL_IP_PROPERTIES
+#include "Property.h"
 #endif
 
 using pymol::cif_array;

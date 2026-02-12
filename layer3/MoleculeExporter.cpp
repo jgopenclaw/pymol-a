@@ -956,6 +956,36 @@ struct MoleculeExporterSDF : public MoleculeExporterMOL {
 
   void writeProperties() {
 #ifdef _PYMOL_IP_PROPERTIES
+    const auto PU = G->PropertyUnique;
+    const PropertyUniqueEntry * item;
+
+    if (!m_last_cs || !m_last_cs->prop_id) {
+      return;
+    }
+    auto offsetIt = PU->id2offset.find(m_last_cs->prop_id);
+    if (offsetIt == PU->id2offset.end()) {
+      return;
+    }
+
+    for (auto offset = offsetIt->second; offset; offset = item->next) {
+      item = &PU->entry[offset];
+
+      m_offset += VLAprintf(m_buffer, m_offset, ">  <%s>\n",
+          OVLexicon_FetchCString(PU->propnames, item->prop_id));
+
+      switch (item->type) {
+        case PropertyType::String:
+          m_offset += VLAprintf(m_buffer, m_offset, "%s\n\n",
+              OVLexicon_FetchCString(PU->string_values, std::get<int>(item->value)));
+          break;
+        case PropertyType::Float:
+          m_offset += VLAprintf(m_buffer, m_offset, "%f\n\n", std::get<double>(item->value));
+          break;
+        default:
+          m_offset += VLAprintf(m_buffer, m_offset, "%d\n\n", std::get<int>(item->value));
+          break;
+      }
+    }
 #endif
   }
 
@@ -2156,6 +2186,14 @@ protected:
 
     // properties
 #ifdef _PYMOL_IP_PROPERTIES
+    if (!m_last_cs->prop_id)
+      return;
+
+    PyObject *props = PropertyAsPyList(G, m_last_cs->prop_id, false);
+    if (props) {
+      PyObject_SetAttrString(m_model, "molecule_properties", props);
+      Py_DECREF(props);
+    }
 #endif
   }
 

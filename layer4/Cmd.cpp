@@ -5502,7 +5502,8 @@ static PyObject *CmdLoad(PyObject * self, PyObject * args)
   auto result = ExecutiveLoad(G,
                          fname, contents, bytes, type,
                          oname, frame, zoom,
-                         discrete, finish, multiplex, quiet, plugin);
+                         discrete, finish, multiplex, quiet, plugin,
+                         object_props, atom_props, mimic);
 
   OrthoRestorePrompt(G);
   APIExit(G);
@@ -6101,6 +6102,91 @@ static PyObject *CmdAssignAtomTypes(PyObject *self, PyObject *args)
   return APIResultOk(G, ok);
 }
 
+static PyObject *CmdSetProperty(PyObject * self, PyObject * args)
+{
+  PyMOLGlobals *G = nullptr;
+  PyObject *value;
+  char *sname, *propname;
+  int proptype;
+  int state;
+  int quiet;
+  API_SETUP_ARGS(G, self, args, "OsOsiii", &self, &propname, &value, &sname, &proptype, &state, &quiet);
+  APIEnterBlocked(G);
+  pymol::Result<bool> result;
+#ifndef _PYMOL_IP_PROPERTIES
+  result = pymol::make_error("Properties not supported in this build");
+#else
+  {
+    auto r = ExecutiveSetPropertyForObject(G, propname, value, sname, state, proptype, quiet);
+    if (r)
+      result = true;
+    else
+      result = pymol::make_error(r.error().what());
+  }
+#endif
+  APIExitBlocked(G);
+  return APIResult(G, result);
+}
+
+static PyObject *CmdSetAtomProperty(PyObject * self, PyObject * args)
+{
+  PyMOLGlobals *G = nullptr;
+  PyObject *value;
+  char *sele;
+  OrthoLineType s1;
+  char *propname;
+  int proptype;
+  int state;
+  int quiet;
+  int ok = false;
+  API_SETUP_ARGS(G, self, args, "OsOsiii", &self, &propname, &value, &sele, &proptype, &state, &quiet);
+
+  pymol::Result<> result;
+  {
+    APIEnterBlocked(G);
+#ifndef _PYMOL_IP_PROPERTIES
+    result = pymol::make_error("Properties not supported in this build");
+#else
+    ok = (SelectorGetTmp(G, sele, s1) >= 0);
+    if (ok){
+      ok = ExecutiveSetAtomPropertyForSelection(G, propname, value, s1, state, proptype, quiet);
+      SelectorFreeTmp(G, s1);
+    }
+    if (!ok) {
+      result = pymol::Error::QUIET;
+    }
+#endif
+    APIExitBlocked(G);
+  }
+  return APIResult(G, result);
+}
+
+static PyObject *CmdGetProperty(PyObject * self, PyObject * args)
+{
+  PyMOLGlobals *G = nullptr;
+  char *sname, *propname;
+  int state, quiet;
+  PyObject *result = Py_None;
+  int ok = false;
+  ok = PyArg_ParseTuple(args, "Ozsii", &self, &propname, &sname, &state, &quiet);
+  if(ok) {
+    API_SETUP_PYMOL_GLOBALS;
+    ok = (G != nullptr);
+  } else {
+    API_HANDLE_ERROR;
+  }
+  if(ok){
+    APIEnterBlocked(G);
+#ifndef _PYMOL_IP_PROPERTIES
+    ok = ErrMessage(G, __FUNCTION__, "Properties not supported in this build");
+#else
+    result = ExecutiveGetPropertyForObject(G, propname, sname, state, quiet);
+#endif
+    APIExitBlocked(G);
+  }
+  return APIAutoNone(result);
+}
+
 static PyObject *CmdSetDiscrete(PyObject * self, PyObject * args)
 {
   const char *name;
@@ -6341,6 +6427,7 @@ static PyMethodDef Cmd_methods[] = {
   {"get_min_max", CmdGetMinMax, METH_VARARGS},
   {"get_mtl_obj", CmdGetMtlObj, METH_VARARGS},
   {"get_model", CmdGetModel, METH_VARARGS},
+  {"get_property", CmdGetProperty, METH_VARARGS},
   {"get_bonds", CmdGetBonds, METH_VARARGS},
   {"get_modal_draw", CmdGetModalDraw, METH_VARARGS},
   {"get_moment", CmdGetMoment, METH_VARARGS},
@@ -6495,6 +6582,8 @@ static PyMethodDef Cmd_methods[] = {
   {"set_colorection", CmdSetColorection, METH_VARARGS},
   {"set_dihe", CmdSetDihe, METH_VARARGS},
   {"set_discrete", CmdSetDiscrete, METH_VARARGS},
+  {"set_property", CmdSetProperty, METH_VARARGS},
+  {"set_atom_property", CmdSetAtomProperty, METH_VARARGS},
   {"set_feedback", CmdSetFeedbackMask, METH_VARARGS},
   {"set_frame", CmdSetFrame, METH_VARARGS},
   {"set_name", CmdSetName, METH_VARARGS},

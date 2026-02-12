@@ -71,6 +71,10 @@
 #include "OpenVRMode.h"
 #endif
 
+#ifdef _PYMOL_IP_PROPERTIES
+#include "Property.h"
+#endif
+
 #include "PyMOL.h"
 #include "PyMOLGlobals.h"
 #include "PyMOLOptions.h"
@@ -1939,6 +1943,9 @@ void PyMOL_Start(CPyMOL * I)
   ShaderMgrInit(G);
   G->GFXMgr = new GFXManager(G->ShaderMgr);
   SettingInitGlobal(G, true, true, false);
+#ifdef _PYMOL_IP_PROPERTIES
+  PropertyInit(G);
+#endif
   SettingSetGlobal_i(G, cSetting_internal_gui, G->Option->internal_gui);
   SettingSetGlobal_i(G, cSetting_internal_feedback, G->Option->internal_feedback);
   TextureInit(G);
@@ -2045,6 +2052,9 @@ void PyMOL_Stop(CPyMOL * I)
   TextureFree(G);
   SphereFree(G);
   PlugIOManagerFree(G);
+#ifdef _PYMOL_IP_PROPERTIES
+  PropertyFree(G);
+#endif
   PFree(G);
   CGORendererFree(G);
   ColorFree(G);

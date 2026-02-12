@@ -148,6 +148,8 @@ struct CoordSet : CObjectState {
 #endif
 
 #ifdef _PYMOL_IP_PROPERTIES
+  /* Properties */
+  int prop_id = 0;
 #endif
 
   /* Atom-state Settings */

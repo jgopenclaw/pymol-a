@@ -104,6 +104,10 @@
 #include "MovieScene.h"
 #include "Texture.h"
 
+#ifdef _PYMOL_IP_PROPERTIES
+#include "Property.h"
+#endif
+
 #ifdef _PYMOL_OPENVR
 #include "OpenVRMode.h"
 #endif
@@ -4050,6 +4054,20 @@ pymol::Result<> ExecutiveLoad(PyMOLGlobals* G, ExecutiveLoadArgs const& args)
 
     OVLexicon* loadproplex = nullptr;
     bool loadpropertiesall = false;
+
+#ifdef _PYMOL_IP_PROPERTIES
+    if (object_props[0]) {
+      if (strcmp(object_props, "*") == 0) {
+        loadpropertiesall = true;
+      } else {
+        auto keys = strsplit(object_props);
+        loadproplex = OVLexicon_New(G->Context->heap);
+        for (auto& key : keys) {
+          OVLexicon_GetFromCString(loadproplex, key.c_str());
+        }
+      }
+    }
+#endif
 
     // (some of) these file types support multiple molecules per file,
     // and we support to load them into separate objects (multiplex).
@@ -9909,6 +9927,21 @@ pymol::Result<> ExecutiveSeleToObject(PyMOLGlobals* G, const char* name,
               source, target, false, 0, quiet);
 
 #ifdef _PYMOL_IP_PROPERTIES
+          if (copy_properties) {
+            // old_obj to new_obj
+            if (old_obj->NCSet == new_obj->NCSet) {
+              // only if the objects have the same number of CoordSets (for now)
+              int state;
+              for (state = 0; state < new_obj->NCSet; state++) {
+                CoordSet *new_cs = new_obj->CSet[state],
+                         *old_cs = old_obj->CSet[state];
+                if (old_cs->prop_id) {
+                  PropertyCheckUniqueID(G, new_cs);
+                  PropertyCopyProperties(G, old_cs->prop_id, new_cs->prop_id);
+                }
+              }
+            }
+          }
 #endif
 
           ExecutiveDoZoom(G, new_obj, !exists, zoom, true);
@@ -16893,6 +16926,93 @@ ok_except1:
 }
 
 #ifdef _PYMOL_IP_PROPERTIES
+/**
+ * Like ExecutiveGetProperty() but also return the type code.
+ *
+ * @return A [type, value] pair, or nullptr if there is no such property
+ */
+CPythonVal* ExecutiveGetPropertyForObject(PyMOLGlobals* G, const char* propname,
+    const char* objname, int state, int quiet)
+{
+  CPythonVal* result = nullptr;
+  ObjectMolecule* obj = nullptr;
+  obj = ExecutiveFindObjectMoleculeByName(G, objname);
+  if (obj) {
+    result = ObjectMoleculeGetProperty(obj, propname, state, quiet);
+  } else {
+    PRINTFB(G, FB_Executive, FB_Errors)
+    "ExecutiveGetProperty: objname='%s' not found\n", objname ENDFB(G);
+  }
+  return (result);
+}
+
+/**
+ * @return The property value, or nullptr if there is no such property
+ */
+CPythonVal* ExecutiveGetProperty(PyMOLGlobals* G, const char* propname,
+    const char* objname, int state, int quiet)
+{
+  CPythonVal* result = nullptr;
+  auto* withtype =
+      ExecutiveGetPropertyForObject(G, propname, objname, state, quiet);
+  if (withtype) {
+    result = PyList_GetItem(withtype, 1);
+    CPythonVal_Free(withtype);
+  }
+  return result;
+}
+
+pymol::Result<> ExecutiveSetPropertyForObject(PyMOLGlobals* G,
+    const char* propname, CPythonVal* value, const char* objname, int state,
+    int proptype, int quiet)
+{
+  ObjectMolecule* obj = nullptr;
+  int ok = true;
+
+  auto vla = ExecutiveGetObjectMoleculeVLA(G, objname);
+  if (!vla)
+    return pymol::make_error("No object(s) found");
+  if (ok) {
+    int nObj = VLAGetSize(vla);
+    for (int a = 0; a < nObj; a++) {
+      obj = vla[a];
+      ok &= ObjectMoleculeSetProperty((ObjectMolecule*) obj, propname, value,
+          static_cast<PropertyType>(proptype), state, quiet);
+    }
+  }
+  if (!ok) {
+    return pymol::make_error("Error while setting properties...");
+  }
+  return {};
+}
+
+int ExecutiveSetAtomPropertyForSelection(PyMOLGlobals* G, const char* propname,
+    CPythonVal* value, const char* s1, int state, int proptype, int quiet)
+{
+  int sele1, result, ok = true;
+  sele1 = SelectorIndexByName(G, s1);
+
+  if (state < 0)
+    state = 0;
+
+  {
+    int unblock = PAutoBlock(G); /*   PBlock(G);    PBlockAndUnlockAPI(); */
+    if (sele1 >= 0) {
+      result = SelectorSetAtomPropertyForSelection(G, sele1, propname, value,
+          static_cast<PropertyType>(proptype), state, quiet);
+      if (!quiet && !result) {
+        PRINTFB(G, FB_Executive, FB_Warnings)
+        "ExecutiveSetAtomPropertyForSelection: no atoms set\n" ENDFB(G);
+      }
+    }
+    if (PyErr_Occurred()) {
+      PyErr_Print();
+      ok = false;
+    }
+    PAutoUnblock(G, unblock); /*    PUnblock(G);  PLockAPIAndUnblock(); */
+  }
+  return (ok);
+}
 #endif // _PYMOL_IP_PROPERTIES
 
 void ExecutiveUniqueIDAtomDictInvalidate(PyMOLGlobals* G)

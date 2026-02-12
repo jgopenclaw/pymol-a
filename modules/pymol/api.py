@@ -472,6 +472,13 @@ from .util import \
 from .stereochemistry import \
       assign_stereo
 
+from . import properties
+from .properties import \
+     get_property, \
+     get_property_list, \
+     set_property, \
+     set_atom_property
+
 #--------------------------------------------------------------------
 # Modules which contain programs used explicity as "module.xxx"
 

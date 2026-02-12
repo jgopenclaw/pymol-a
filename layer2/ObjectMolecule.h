@@ -521,6 +521,12 @@ int ObjectMoleculeUpdateMMStereoInfoForState(PyMOLGlobals * G, ObjectMolecule * 
 #endif
 
 #ifdef _PYMOL_IP_PROPERTIES
+PyObject* ObjectMoleculeGetProperty(
+    ObjectMolecule* I, const char* propname, int state, int quiet);
+
+enum class PropertyType;
+int ObjectMoleculeSetProperty(ObjectMolecule* I, const char* propname,
+    PyObject* value, const PropertyType& proptype, int state, int quiet);
 #endif
 
 void AtomInfoSettingGenerateSideEffects(PyMOLGlobals * G, ObjectMolecule *obj, int index, int id);
