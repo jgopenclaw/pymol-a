@@ -273,9 +273,7 @@ typedef struct AtomInfoType {
   int rank;
   int visRep;                   /* bitmask for all reps */
 
-#if defined(_PYMOL_IP_EXTRAS) || defined(_PYMOL_IP_PROPERTIES)
   int prop_id;
-#endif
 
   // boolean flags
   bool hetatm : 1;

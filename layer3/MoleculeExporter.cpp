@@ -38,13 +38,9 @@
 #include "MaeExportHelpers.h"
 #include "Feedback.h"
 
-#ifdef _PYMOL_IP_PROPERTIES
 #include "Property.h"
-#endif
 
-#ifdef _PYMOL_IP_PROPERTIES
 #define _PYMOL_MAE_PROP_EXPORT
-#endif
 
 /**
  * Get the capitalized element symbol. Assume that ai->elem is either all
@@ -713,12 +709,10 @@ struct MoleculeExporterCIF : public MoleculeExporter {
     const AtomInfoType * ai = m_iter.getAtomInfo();
     const char * entity_id = nullptr;
 
-#ifdef _PYMOL_IP_PROPERTIES
     char entity_id_buf[16];
     if (ai->prop_id) {
       entity_id = PropertyGetAsString(G, ai->prop_id, "entity_id", entity_id_buf);
     }
-#endif
 
     if (!entity_id) {
       entity_id = LexStr(G, ai->custom);
@@ -955,7 +949,6 @@ struct MoleculeExporterSDF : public MoleculeExporterMOL {
   }
 
   void writeProperties() {
-#ifdef _PYMOL_IP_PROPERTIES
     const auto PU = G->PropertyUnique;
     const PropertyUniqueEntry * item;
 
@@ -986,7 +979,6 @@ struct MoleculeExporterSDF : public MoleculeExporterMOL {
           break;
       }
     }
-#endif
   }
 
   void writeBonds() override {
@@ -2185,7 +2177,6 @@ protected:
     }
 
     // properties
-#ifdef _PYMOL_IP_PROPERTIES
     if (!m_last_cs->prop_id)
       return;
 
@@ -2194,7 +2185,6 @@ protected:
       PyObject_SetAttrString(m_model, "molecule_properties", props);
       Py_DECREF(props);
     }
-#endif
   }
 
   bool excludeSymOpBonds() const override { return false; }

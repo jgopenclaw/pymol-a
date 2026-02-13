@@ -865,7 +865,6 @@ CoordSet* ExecutiveGetCoordSet(PyMOLGlobals* G, const char* name, int state,
 pymol::Result<> ExecutiveLoadCoordset(PyMOLGlobals* G,
     pymol::zstring_view oname, PyObject* model, int frame, bool quiet);
 
-#ifdef _PYMOL_IP_PROPERTIES
 pymol::Result<> ExecutiveSetPropertyForObject(PyMOLGlobals* G,
     const char* propname, PyObject* value, const char* objname = "*",
     int state = cStateAll, int proptype = -1, int quiet = true);
@@ -882,7 +881,6 @@ inline PyObject* ExecutiveGetPropertyList(PyMOLGlobals* G,
 {
   return ExecutiveGetPropertyForObject(G, nullptr, objname, state, quiet);
 }
-#endif
 
 void ExecutiveUndo(PyMOLGlobals* G, int dir);
 int ExecutiveSaveUndo(PyMOLGlobals* G, const char* s1, int state);

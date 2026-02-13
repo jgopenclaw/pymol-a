@@ -18,8 +18,6 @@ Z* -------------------------------------------------------------------
 
 #include "Property.h"
 
-#ifdef _PYMOL_IP_PROPERTIES
-
 #include "os_std.h"
 
 #include "Base.h"
@@ -933,5 +931,4 @@ int PropertySet(
 
   return true;
 }
-#endif
 #endif

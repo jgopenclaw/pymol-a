@@ -50,9 +50,7 @@
 
 #include "pocketfft_hdronly.h"
 
-#ifdef _PYMOL_IP_PROPERTIES
 #include "Property.h"
-#endif
 
 using pymol::cif_array;
 
@@ -254,9 +252,7 @@ inline bool find2(Map& dict,
 static void AtomInfoSetEntityId(PyMOLGlobals * G, AtomInfoType * ai, const char * entity_id) {
   ai->custom = LexIdx(G, entity_id);
 
-#ifdef _PYMOL_IP_PROPERTIES
   PropertySet(G, ai, "entity_id", entity_id);
-#endif
 }
 
 /**

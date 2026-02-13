@@ -1698,10 +1698,8 @@ static PyObject* CmdGetCapabilities(PyObject*, PyObject*)
     // numpy support (cmd.get_coords, cmd.get_volume_field)
     PySet_Add(caps, PConvToPyObject("numpy"));
 #endif
-#ifdef _PYMOL_IP_PROPERTIES
-    // object and atom level properties, incentive feature since PyMOL 1.6
+    // object and atom level properties
     PySet_Add(caps, PConvToPyObject("properties"));
-#endif
 #ifndef NO_MMLIBS
     // mmlibs atom typing and stereochemistry, incentive feature PyMOL 1.4-1.8
     PySet_Add(caps, PConvToPyObject("mmlibs"));
@@ -6113,9 +6111,6 @@ static PyObject *CmdSetProperty(PyObject * self, PyObject * args)
   API_SETUP_ARGS(G, self, args, "OsOsiii", &self, &propname, &value, &sname, &proptype, &state, &quiet);
   APIEnterBlocked(G);
   pymol::Result<bool> result;
-#ifndef _PYMOL_IP_PROPERTIES
-  result = pymol::make_error("Properties not supported in this build");
-#else
   {
     auto r = ExecutiveSetPropertyForObject(G, propname, value, sname, state, proptype, quiet);
     if (r)
@@ -6123,7 +6118,6 @@ static PyObject *CmdSetProperty(PyObject * self, PyObject * args)
     else
       result = pymol::make_error(r.error().what());
   }
-#endif
   APIExitBlocked(G);
   return APIResult(G, result);
 }
@@ -6144,9 +6138,6 @@ static PyObject *CmdSetAtomProperty(PyObject * self, PyObject * args)
   pymol::Result<> result;
   {
     APIEnterBlocked(G);
-#ifndef _PYMOL_IP_PROPERTIES
-    result = pymol::make_error("Properties not supported in this build");
-#else
     ok = (SelectorGetTmp(G, sele, s1) >= 0);
     if (ok){
       ok = ExecutiveSetAtomPropertyForSelection(G, propname, value, s1, state, proptype, quiet);
@@ -6155,7 +6146,6 @@ static PyObject *CmdSetAtomProperty(PyObject * self, PyObject * args)
     if (!ok) {
       result = pymol::Error::QUIET;
     }
-#endif
     APIExitBlocked(G);
   }
   return APIResult(G, result);
@@ -6177,11 +6167,7 @@ static PyObject *CmdGetProperty(PyObject * self, PyObject * args)
   }
   if(ok){
     APIEnterBlocked(G);
-#ifndef _PYMOL_IP_PROPERTIES
-    ok = ErrMessage(G, __FUNCTION__, "Properties not supported in this build");
-#else
     result = ExecutiveGetPropertyForObject(G, propname, sname, state, quiet);
-#endif
     APIExitBlocked(G);
   }
   return APIAutoNone(result);

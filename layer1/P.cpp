@@ -63,9 +63,7 @@ the initialization functions for these libraries on startup.
 #include "Seeker.h"
 #include "Feedback.h"
 
-#ifdef _PYMOL_IP_PROPERTIES
 #include"Property.h"
-#endif
 
 #include <memory>
 
@@ -396,7 +394,6 @@ static PyTypeObject settingWrapper_Type = {
   0,                            /* tp_basicsize */
 };
 
-#ifdef _PYMOL_IP_PROPERTIES
 static PyMappingMethods propertyMappingMethods;
 static PyGetSetDef propertyGetSetMethods[2];
 static PyTypeObject propertyWrapper_Type = {
@@ -404,7 +401,6 @@ static PyTypeObject propertyWrapper_Type = {
   "wrapper.PropertyWrapper",    /* tp_name */
   0,                            /* tp_basicsize */
 };
-#endif
 
 /**
  * If `wob` is not in a valid state (outside iterate-family context), raise
@@ -544,7 +540,6 @@ int SettingWrapperObjectAssignSubScript(PyObject *obj, PyObject *key, PyObject *
   return 0; // success
 }
 
-#ifdef _PYMOL_IP_PROPERTIES
 /**
  * Get all atom properties as a Python dictionary
  */
@@ -579,7 +574,6 @@ static PyObject* PropertyWrapperObjectIter(PyObject *self)
 
   return iter;
 }
-#endif
 
 /**
  * Python iterator over atom or atom-state setting indices
@@ -607,7 +601,6 @@ static PyObject* SettingWrapperObjectIter(PyObject *self)
   return iter;
 }
 
-#ifdef _PYMOL_IP_PROPERTIES
 /**
  * Access atom-level property
  *
@@ -657,7 +650,6 @@ int PropertyWrapperObjectAssignSubScript(PyObject *obj, PyObject *key, PyObject 
   Py_DECREF(keyobj);
   return ret;
 }
-#endif
 
 /**
  * Allows attribute-like syntax for item lookups
@@ -839,10 +831,6 @@ PyObject * WrapperObjectSubScript(PyObject *obj, PyObject *key){
       ret = PIncRef(wobj->settingWrapperObject);
       break;
     case cPType_properties:
-#ifndef _PYMOL_IP_PROPERTIES
-      PyErr_SetString(P_IncentiveOnlyException,
-          "'properties/p' not supported in Open-Source PyMOL");
-#else
       if (!wobj->propertyWrapperObject) {
         wobj->propertyWrapperObject =
             static_cast<SettingPropertyWrapperObject*>(
@@ -850,7 +838,6 @@ PyObject * WrapperObjectSubScript(PyObject *obj, PyObject *key){
         wobj->propertyWrapperObject->wobj = wobj;
       }
       ret = PIncRef(wobj->propertyWrapperObject);
-#endif
       break;
     case cPType_state:
       ret = PyLong_FromLong(wobj->state);
@@ -1521,9 +1508,7 @@ WrapperObject * WrapperObjectNew() {
       PyType_GenericNew(&Wrapper_Type, Py_None, Py_None));
   wobj->dict = nullptr;
   wobj->settingWrapperObject = nullptr;
-#ifdef _PYMOL_IP_PROPERTIES
   wobj->propertyWrapperObject = nullptr;
-#endif
   return wobj;
 }
 
@@ -1929,9 +1914,7 @@ static void WrapperObjectDealloc(PyObject* self)
 {
   auto wo = static_cast<WrapperObject*>(self);
   Py_XDECREF(wo->settingWrapperObject);
-#ifdef _PYMOL_IP_PROPERTIES
   Py_XDECREF(wo->propertyWrapperObject);
-#endif
   Py_XDECREF(wo->dict);
   self->ob_type->tp_free(self);
 }
@@ -2110,8 +2093,7 @@ void PInit(PyMOLGlobals * G, int global_instance)
     settingWrapper_Type.tp_as_mapping = &settingMappingMethods;
     settingWrapper_Type.tp_getattro = PyObject_GenericGetAttrOrItem;
     settingWrapper_Type.tp_setattro = PyObject_GenericSetAttrAsItem;
-    
-#ifdef _PYMOL_IP_PROPERTIES
+
     propertyWrapper_Type.tp_basicsize = sizeof(SettingPropertyWrapperObject);
     propertyWrapper_Type.tp_flags = Py_TPFLAGS_DEFAULT;
     propertyWrapper_Type.tp_iter = &PropertyWrapperObjectIter;
@@ -2127,13 +2109,10 @@ void PInit(PyMOLGlobals * G, int global_instance)
     propertyWrapper_Type.tp_as_mapping = &propertyMappingMethods;
     propertyWrapper_Type.tp_getattro = PyObject_GenericGetAttrOrItem;
     propertyWrapper_Type.tp_setattro = PyObject_GenericSetAttrAsItem;
-#endif
 
     if (PyType_Ready(&Wrapper_Type) < 0
         || PyType_Ready(&settingWrapper_Type) < 0
-#ifdef _PYMOL_IP_PROPERTIES
         || PyType_Ready(&propertyWrapper_Type) < 0
-#endif
         ){
       PRINTFB(G, FB_Python, FB_Errors)
 	" PInit: Wrapper_Type, settingWrapper_Type, propertyWrapper_Type not ready\n" ENDFB(G);
@@ -2141,9 +2120,7 @@ void PInit(PyMOLGlobals * G, int global_instance)
     }
     Py_INCREF(&Wrapper_Type);
     Py_INCREF(&settingWrapper_Type);
-#ifdef _PYMOL_IP_PROPERTIES
     Py_INCREF(&propertyWrapper_Type);
-#endif
   }
   }
 

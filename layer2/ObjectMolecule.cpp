@@ -49,9 +49,7 @@ Z* -------------------------------------------------------------------
 #include "Feedback.h"
 #include "Util2.h"
 
-#ifdef _PYMOL_IP_PROPERTIES
 #include "Property.h"
-#endif
 
 #ifdef _WEBGL
 #endif
@@ -6561,7 +6559,6 @@ int const* ObjectMolecule::getNeighborArray() const
 
 /*========================================================================*/
 #ifndef _PYMOL_NOPY
-#ifdef _PYMOL_IP_PROPERTIES
 static void copy_and_trim_repr(char* dest, PyObject* obj)
 {
   PyObject* repr = PyObject_Repr(obj);
@@ -6576,7 +6573,6 @@ static void copy_and_trim_repr(char* dest, PyObject* obj)
   dest[srclen] = 0;
   Py_DECREF(repr);
 }
-#endif
 
 static CoordSet *ObjectMoleculeChemPyModel2CoordSet(PyMOLGlobals * G,
                                                     PyObject * model,
@@ -7203,7 +7199,6 @@ static CoordSet *ObjectMoleculeChemPyModel2CoordSet(PyMOLGlobals * G,
     cset->NTmpBond = nBond;
     cset->TmpBond = pymol::vla_take_ownership(bond);
 
-#ifdef _PYMOL_IP_PROPERTIES
     {
       PyObject *propList = nullptr, *propName, *propValue, *propKeyValue;
       OrthoLineType nameString;
@@ -7229,7 +7224,6 @@ static CoordSet *ObjectMoleculeChemPyModel2CoordSet(PyMOLGlobals * G,
       }
       Py_XDECREF(propList);
     }
-#endif
   } else {
     VLAFreeP(bond);
     VLAFreeP(coord);
@@ -7618,7 +7612,6 @@ ok_except1:
 
 /*========================================================================*/
 
-#ifdef _PYMOL_IP_PROPERTIES
 static char* sdl_mol_prop_name(const char* prop, short* isprop)
 {
   int i, j, len;
@@ -7696,15 +7689,12 @@ static short is_sdl_mol_prop_name(const char* prop)
   FreeP(cctmp);
   return isprop;
 }
-#endif
 
 /*========================================================================*/
 
 static CoordSet *ObjectMoleculeMOLStr2CoordSet(PyMOLGlobals * G, const char *buffer,
                                                AtomInfoType ** atInfoPtr, const char **restart
-#ifdef _PYMOL_IP_PROPERTIES
                                                , short loadpropertiesall, OVLexicon *loadproplex
-#endif
                                                )
 {
   const char *p;
@@ -7893,7 +7883,6 @@ static CoordSet *ObjectMoleculeMOLStr2CoordSet(PyMOLGlobals * G, const char *buf
     cset->NTmpBond = nBond;
     cset->TmpBond = pymol::vla_take_ownership(bond);
     strcpy(cset->Name, nameTmp);
-#ifdef _PYMOL_IP_PROPERTIES
     p = nextline(p);
     // Need to read in the properties
     {
@@ -7976,7 +7965,6 @@ static CoordSet *ObjectMoleculeMOLStr2CoordSet(PyMOLGlobals * G, const char *buf
       VLAFreeP(cc);
       VLAFreeP(cctmp);
     }
-#endif
   } else {
     VLAFreeP(bond);
     VLAFreeP(coord);
@@ -7993,18 +7981,14 @@ static CoordSet *ObjectMoleculeMOLStr2CoordSet(PyMOLGlobals * G, const char *buf
 static CoordSet *ObjectMoleculeSDF2Str2CoordSet(PyMOLGlobals * G, const char *buffer,
                                                 AtomInfoType ** atInfoPtr,
                                                 const char **next_mol
-#ifdef _PYMOL_IP_PROPERTIES
                                                 , short loadpropertiesall, OVLexicon *loadproplex
-#endif
                                                 )
 {
   char cc[MAXLINELEN];
   const char *p;
   CoordSet *result = nullptr;
   result = ObjectMoleculeMOLStr2CoordSet(G, buffer, atInfoPtr, next_mol
-#ifdef _PYMOL_IP_PROPERTIES
       , loadpropertiesall, loadproplex
-#endif
       );
   p = *next_mol;
   if(p) {
@@ -8785,18 +8769,14 @@ ObjectMolecule *ObjectMoleculeReadStr(PyMOLGlobals * G, ObjectMolecule * I,
     case cLoadTypeMOL:
     case cLoadTypeMOLStr:
       cset = ObjectMoleculeMOLStr2CoordSet(G, start, &atInfo, &restart
-#ifdef _PYMOL_IP_PROPERTIES
           , loadpropertiesall, loadproplex
-#endif
           );
       restart = nullptr;
       break;
     case cLoadTypeSDF2:
     case cLoadTypeSDF2Str:
       cset = ObjectMoleculeSDF2Str2CoordSet(G, start, &atInfo, &restart
-#ifdef _PYMOL_IP_PROPERTIES
           , loadpropertiesall, loadproplex
-#endif
           );
       break;
     case cLoadTypeXYZ:
@@ -11881,7 +11861,6 @@ CoordSet *ObjectMoleculeMMDStr2CoordSet(PyMOLGlobals * G, const char *buffer,
 #ifdef _PYMOL_IP_EXTRAS
 #endif
 
-#ifdef _PYMOL_IP_PROPERTIES
 CPythonVal* ObjectMoleculeGetProperty(
     ObjectMolecule* I, const char* propname, int state, int quiet)
 {
@@ -11904,7 +11883,6 @@ int ObjectMoleculeSetProperty(ObjectMolecule* I, const char* propname,
   }
   return (ok);
 }
-#endif
 
 void AtomInfoSettingGenerateSideEffects(PyMOLGlobals * G, ObjectMolecule *obj, int index, int id){
   switch(index){

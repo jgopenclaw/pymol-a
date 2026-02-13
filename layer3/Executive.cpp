@@ -104,9 +104,7 @@
 #include "MovieScene.h"
 #include "Texture.h"
 
-#ifdef _PYMOL_IP_PROPERTIES
 #include "Property.h"
-#endif
 
 #ifdef _PYMOL_OPENVR
 #include "OpenVRMode.h"
@@ -3874,10 +3872,8 @@ pymol::Result<> ExecutiveLoad(PyMOLGlobals* G, ExecutiveLoadArgs const& args)
   const char* content = args.content.data();
   int size = args.content.size();
   const char* object_name = args.object_name.c_str();
-#ifdef _PYMOL_IP_PROPERTIES
   const char* object_props = args.object_props.c_str();
   const char* atom_props = args.atom_props.c_str();
-#endif
   const char* plugin = args.plugin.c_str();
   auto content_format = args.content_format;
   auto state = args.state;
@@ -4055,7 +4051,6 @@ pymol::Result<> ExecutiveLoad(PyMOLGlobals* G, ExecutiveLoadArgs const& args)
     OVLexicon* loadproplex = nullptr;
     bool loadpropertiesall = false;
 
-#ifdef _PYMOL_IP_PROPERTIES
     if (object_props[0]) {
       if (strcmp(object_props, "*") == 0) {
         loadpropertiesall = true;
@@ -4067,7 +4062,6 @@ pymol::Result<> ExecutiveLoad(PyMOLGlobals* G, ExecutiveLoadArgs const& args)
         }
       }
     }
-#endif
 
     // (some of) these file types support multiple molecules per file,
     // and we support to load them into separate objects (multiplex).
@@ -9926,7 +9920,6 @@ pymol::Result<> ExecutiveSeleToObject(PyMOLGlobals* G, const char* name,
               2, /* Object state mode */
               source, target, false, 0, quiet);
 
-#ifdef _PYMOL_IP_PROPERTIES
           if (copy_properties) {
             // old_obj to new_obj
             if (old_obj->NCSet == new_obj->NCSet) {
@@ -9942,7 +9935,6 @@ pymol::Result<> ExecutiveSeleToObject(PyMOLGlobals* G, const char* name,
               }
             }
           }
-#endif
 
           ExecutiveDoZoom(G, new_obj, !exists, zoom, true);
         }
@@ -16925,7 +16917,6 @@ ok_except1:
   return cs;
 }
 
-#ifdef _PYMOL_IP_PROPERTIES
 /**
  * Like ExecutiveGetProperty() but also return the type code.
  *
@@ -17013,7 +17004,6 @@ int ExecutiveSetAtomPropertyForSelection(PyMOLGlobals* G, const char* propname,
   }
   return (ok);
 }
-#endif // _PYMOL_IP_PROPERTIES
 
 void ExecutiveUniqueIDAtomDictInvalidate(PyMOLGlobals* G)
 {

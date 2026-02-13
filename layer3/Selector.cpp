@@ -58,9 +58,7 @@ Z* -------------------------------------------------------------------
 #include"ListMacros.h"
 #include "Util2.h"
 
-#ifdef _PYMOL_IP_PROPERTIES
 #include "Property.h"
-#endif
 
 #include "pymol/zstring_view.h"
 
@@ -8585,10 +8583,6 @@ static pymol::Result<> SelectorSelect3(
   base->sele_err_chk_ptr(G);
   switch (base->code) {
   case SELE_PROP:
-#ifndef _PYMOL_IP_PROPERTIES
-    return pymol::Error::make<pymol::Error::INCENTIVE_ONLY>(
-        "properties (p.) not supported in Open-Source PyMOL");
-#else
     oper = WordKey(G, AtOper, base[2].text(), 4, 0, &exact);
     switch (oper) {
     case SCMP_GTHN:
@@ -8629,7 +8623,6 @@ static pymol::Result<> SelectorSelect3(
       return pymol::make_error("Invalid Operator: ", base[2].text());
     }
     break;
-#endif
   default:
     assert(false);
   }
@@ -11052,7 +11045,6 @@ attrib b < 0
 
 */
 
-#ifdef _PYMOL_IP_PROPERTIES
 int SelectorSetAtomPropertyForSelection(PyMOLGlobals* G, int sele,
     const char* propname, CPythonVal* value, const PropertyType& proptype,
     int state, int quiet)
@@ -11083,7 +11075,6 @@ int SelectorSetAtomPropertyForSelection(PyMOLGlobals* G, int sele,
   return nAtom;
 #endif
 }
-#endif
 
 bool SelectorSelectionExists(PyMOLGlobals* G, pymol::zstring_view sname)
 {

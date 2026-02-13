@@ -198,11 +198,9 @@ int SelectorResidueVLAsTo3DMatchScores(PyMOLGlobals * G, CMatch * match,
 
 int SelectorAssignAtomTypes(PyMOLGlobals * G, int sele, int state, int quiet, int format);
 
-#ifdef _PYMOL_IP_PROPERTIES
 int SelectorSetAtomPropertyForSelection(PyMOLGlobals* G, int sele,
     const char* propname, PyObject* value, const PropertyType& proptype, int state,
     int quiet);
-#endif
 
 /* reserve special meaning for tags 1-15 and note that 0 is disallowed */
 

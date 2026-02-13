@@ -17,8 +17,6 @@ Z* -------------------------------------------------------------------
 
 #include "PyMOLGlobals.h"
 
-#ifdef _PYMOL_IP_PROPERTIES
-
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -156,5 +154,3 @@ PyObject* PropertyGetPyObject(
     r = PropertyGetPropertyImpl(G, x->prop_id, propname, returnList);
   return r;
 }
-
-#endif

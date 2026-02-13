@@ -38,9 +38,7 @@ Z* -------------------------------------------------------------------
 #include "Lex.h"
 #include "pymol/zstring_view.h"
 
-#ifdef _PYMOL_IP_PROPERTIES
 #include "Property.h"
-#endif
 
 #include <map>
 #include <unordered_set>
@@ -860,9 +858,7 @@ PyObject *AtomInfoAsPyList(PyMOLGlobals * G, const AtomInfoType * I)
 
   PyList_SetItem(result, 47, PyString_FromString(LexStr(G, I->custom)));
   PyList_SetItem(result, 48, PConvAutoNone(
-#ifdef _PYMOL_IP_PROPERTIES
         I->prop_id ? PropertyAsPyList(G, I->prop_id, true) :
-#endif
         Py_None));
 
   return (PConvAutoNone(result));
@@ -1000,13 +996,11 @@ int AtomInfoFromPyList(PyMOLGlobals * G, AtomInfoType * I, PyObject * list)
     PCONVPYSTRTOLEXIDX(47, I->custom);
   }
 
-#ifdef _PYMOL_IP_PROPERTIES
   if(ok && (ll > 48)) {
     CPythonVal *val = PyList_GetItem(list, 48);
     I->prop_id = PropertyFromPyList(G, val);
     CPythonVal_Free(val);
   }
-#endif
 
   return (ok);
 }
@@ -1032,13 +1026,11 @@ void AtomInfoCopy(PyMOLGlobals * G, const AtomInfoType * src, AtomInfoType * dst
   LexInc(G, dst->segi);
   LexInc(G, dst->resn);
   LexInc(G, dst->name);
-#ifdef _PYMOL_IP_PROPERTIES
   if (dst->prop_id){
     dst->prop_id = 0;
     PropertyCheckUniqueID(G, dst);
     PropertyCopyProperties(G, src->prop_id, dst->prop_id);
   }
-#endif
   if (src->anisou) {
     dst->anisou = nullptr;
     memcpy(dst->get_anisou(), src->anisou, 6 * sizeof(float));
@@ -1090,12 +1082,10 @@ void AtomInfoPurge(PyMOLGlobals * G, AtomInfoType * ai)
 
     I->ActiveIDs.erase(ai->unique_id);
   }
-#ifdef _PYMOL_IP_PROPERTIES
   if (ai->prop_id) {
     PropertyUniqueDetachChain(G, ai->prop_id);
     ai->prop_id = 0;
   }
-#endif
   DeleteAP(ai->anisou);
 }
 
@@ -1136,9 +1126,7 @@ void AtomInfoCombine(PyMOLGlobals * G, AtomInfoType * dst, AtomInfoType&& src_, 
 
   SWAP_NOREF(dst->has_setting, src->has_setting);
   std::swap(dst->unique_id, src->unique_id);
-#if defined(_PYMOL_IP_EXTRAS) || defined(_PYMOL_IP_PROPERTIES)
   std::swap(dst->prop_id, src->prop_id);
-#endif
 
   /* keep all existing names, identifiers, etc. */
   /* also keep all existing selections,

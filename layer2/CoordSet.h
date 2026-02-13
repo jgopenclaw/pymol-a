@@ -147,10 +147,8 @@ struct CoordSet : CObjectState {
   mmpymolx_prop_state_t validTextType = MMPYMOLX_PROP_STATE_NULL;
 #endif
 
-#ifdef _PYMOL_IP_PROPERTIES
   /* Properties */
   int prop_id = 0;
-#endif
 
   /* Atom-state Settings */
   pymol::vla<int> atom_state_setting_id;

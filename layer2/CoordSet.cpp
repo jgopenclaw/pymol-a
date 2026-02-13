@@ -53,9 +53,7 @@ Z* -------------------------------------------------------------------
 #include "Executive.h"
 #include "Lex.h"
 
-#ifdef _PYMOL_IP_PROPERTIES
 #include "Property.h"
-#endif
 
 /**
  * Get atom coordinates, taking symmetry operation into account.
@@ -253,13 +251,11 @@ int CoordSetFromPyList(PyMOLGlobals * G, PyObject * list, CoordSet ** cs)
       CPythonVal_Free(val);
     }
 
-#ifdef _PYMOL_IP_PROPERTIES
     if (ok && (ll > 9)) {
       CPythonVal* val = CPythonVal_PyList_GetItem(G, list, 9);
       I->prop_id = PropertyFromPyList(G, val);
       CPythonVal_Free(val);
     }
-#endif
 
     if(ok && (ll > 10)){
       CPythonVal *val = CPythonVal_PyList_GetItem(G, list, 10);
@@ -390,9 +386,7 @@ PyObject *CoordSetAsPyList(CoordSet * I)
     PyList_SetItem(result, 8, PConvAutoNone(nullptr) /* LabPos */);
 
     PyList_SetItem(result, 9,
-#ifdef _PYMOL_IP_PROPERTIES
         I->prop_id ? PropertyAsPyList(G, I->prop_id, true) :
-#endif
                    PConvAutoNone(Py_None));
 
     if(I->SculptCGO) {
@@ -1138,7 +1132,6 @@ PyObject *CoordSetAtomToChemPyAtom(PyMOLGlobals * G, AtomInfoType * ai, ObjectMo
     PConvIntToPyObjAttr(atom, "index", index + 1);      /* fragile */
 
 
-#ifdef _PYMOL_IP_PROPERTIES
     if (ai->prop_id) {
       PyObject* props = PropertyAsPyList(G, ai->prop_id, false);
       if (PyList_Check(props)) {
@@ -1152,7 +1145,6 @@ PyObject *CoordSetAtomToChemPyAtom(PyMOLGlobals * G, AtomInfoType * ai, ObjectMo
         }
       }
     }
-#endif
 
   }
   if(PyErr_Occurred())
@@ -1548,12 +1540,10 @@ CoordSet::CoordSet(const CoordSet& cs)
 
   UtilZeroMem(this->Rep, sizeof(::Rep *) * cRepCnt);
 
-#ifdef _PYMOL_IP_PROPERTIES
   if (cs.prop_id) {
     PropertyCheckUniqueID(G, this);
     PropertyCopyProperties(G, cs.prop_id, this->prop_id);
   }
-#endif
 
 }
 
@@ -1649,12 +1639,10 @@ void CoordSet::enumIndices()
 /*========================================================================*/
 CoordSet::~CoordSet()
 {
-#ifdef _PYMOL_IP_PROPERTIES
   if (prop_id) {
     PropertyUniqueDetachChain(G, prop_id);
     prop_id = 0;
   }
-#endif
 
   if (has_any_atom_state_settings()) {
     for (int a = 0; a < NIndex; ++a) {
