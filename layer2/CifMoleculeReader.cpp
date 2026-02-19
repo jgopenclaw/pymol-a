@@ -3392,6 +3392,11 @@ pymol::Result<ObjectMolecule*> ObjectMoleculeReadBCif(PyMOLGlobals* G,
 
     if (cif->datablocks().size() == 1 || multiplex == 0)
       return obj;
+
+    // multiplexing
+    ObjectSetName(obj, datablock.code());
+    ExecutiveDelete(G, obj->Name);
+    ExecutiveManageObject(G, obj, zoom, true);
   }
   return nullptr;
 }
