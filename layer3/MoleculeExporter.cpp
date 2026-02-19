@@ -1756,7 +1756,7 @@ class MoleculeExporterBCIF : public MoleculeExporter {
   {
     // clang-format off
     std::vector<msgpack::object> columns;
-    columns.push_back(encodeStringColumn("group_pdb", db.group_pdb, zone));
+    columns.push_back(encodeStringColumn("group_PDB", db.group_pdb, zone));
     columns.push_back(encodeColumn("id", db.atom_ids, zone));
     columns.push_back(encodeStringColumn("type_symbol", db.elements, zone));
     columns.push_back(encodeStringColumn("label_atom_id", db.atom_names, zone));
@@ -1765,15 +1765,15 @@ class MoleculeExporterBCIF : public MoleculeExporter {
     columns.push_back(encodeStringColumn("label_asym_id", db.chain_ids, zone));
     columns.push_back(encodeStringColumn("label_entity_id", db.entity_ids, zone));
     columns.push_back(encodeColumn("label_seq_id", db.residue_numbers, zone));
-    columns.push_back(encodeStringColumn("pdbx_pdb_ins_code", db.ins_codes, zone));
-    columns.push_back(encodeColumn("cartn_x", db.x_coords, zone));
-    columns.push_back(encodeColumn("cartn_y", db.y_coords, zone));
-    columns.push_back(encodeColumn("cartn_z", db.z_coords, zone));
+    columns.push_back(encodeStringColumn("pdbx_PDB_ins_code", db.ins_codes, zone));
+    columns.push_back(encodeColumn("Cartn_x", db.x_coords, zone));
+    columns.push_back(encodeColumn("Cartn_y", db.y_coords, zone));
+    columns.push_back(encodeColumn("Cartn_z", db.z_coords, zone));
     columns.push_back(encodeColumn("occupancy", db.occupancies, zone));
-    columns.push_back(encodeColumn("b_iso_or_equiv", db.b_factors, zone));
+    columns.push_back(encodeColumn("B_iso_or_equiv", db.b_factors, zone));
     columns.push_back(encodeColumn("pdbx_formal_charge", db.formal_charges, zone));
     columns.push_back(encodeStringColumn("auth_asym_id", db.auth_chain_ids, zone));
-    columns.push_back(encodeColumn("pdbx_pdb_model_num", db.model_nums, zone));
+    columns.push_back(encodeColumn("pdbx_PDB_model_num", db.model_nums, zone));
     // clang-format on
 
     std::unordered_map<std::string, msgpack::object> atom_site_category;
