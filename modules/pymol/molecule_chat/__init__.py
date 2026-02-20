@@ -33,13 +33,18 @@ def __plugin_deactivate__():
 
 
 def __init_plugin__(app=None):
-    from pymol.plugins import addmenuitemqt as addmenuitem
-    addmenuitem('MoleculeChat', dialog)
+    from pymol.plugins import get_pmgapp, addmenuitemqt
+
+    def show_chat_panel():
+        pmgapp = get_pmgapp()
+        if pmgapp is not None:
+            pmgapp.open_chat_panel()
+
+    addmenuitemqt('MoleculeChat', show_chat_panel)
 
 
 def dialog():
     print(' MoleculeChat dialog opened')
-    from pymol import cmd as _self
     from pymol.Qt import QtWidgets
     dialog = QtWidgets.QDialog()
     dialog.setWindowTitle('MoleculeChat')
