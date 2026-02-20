@@ -1,5 +1,6 @@
-from typing import List
+from typing import List, Optional
 from .llm_client import get_llm_client, MissingAPIKeyError
+from .session import ChatSession
 
 
 SYSTEM_PROMPT = """You are a PyMOL command translator. Your task is to convert natural language requests from users into valid PyMOL commands.
@@ -65,13 +66,13 @@ Output: turn x, 90
 Now translate the following user request into PyMOL commands:"""
 
 
-def translate_to_pymol(user_input: str, context: str = "") -> List[str]:
+def translate_to_pymol(user_input: str, session: Optional[ChatSession] = None) -> List[str]:
     """
     Translate natural language user input into PyMOL commands.
     
     Args:
         user_input: The natural language input from the user
-        context: Additional context about current state (objects, view, etc.)
+        session: ChatSession for context (optional, for backward compatibility)
     
     Returns:
         List of PyMOL commands to execute
@@ -80,6 +81,11 @@ def translate_to_pymol(user_input: str, context: str = "") -> List[str]:
         MissingAPIKeyError: If no API key is configured
     """
     llm_client = get_llm_client()
+    
+    if session is not None:
+        context = session.get_context_prompt()
+    else:
+        context = ""
     
     full_context = context.strip() if context else ""
     context_section = ""

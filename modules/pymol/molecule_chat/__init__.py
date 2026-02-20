@@ -10,8 +10,9 @@ from . import executor
 from . import screenshot
 from . import llm_client
 from . import config
+from . import session
 
-__all__ = ['chat_panel', 'command_translator', 'executor', 'screenshot', 'llm_client', 'config']
+__all__ = ['chat_panel', 'command_translator', 'executor', 'screenshot', 'llm_client', 'config', 'session']
 
 __plugin_name__ = 'MoleculeChat'
 __plugin_author__ = 'MoleculeChat Team'
