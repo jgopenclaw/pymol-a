@@ -72,7 +72,7 @@ def translate_to_pymol(user_input: str, session: Optional[ChatSession] = None) -
     
     Args:
         user_input: The natural language input from the user
-        session: ChatSession for context (optional, for backward compatibility)
+        session: ChatSession for context
     
     Returns:
         List of PyMOL commands to execute
@@ -82,69 +82,25 @@ def translate_to_pymol(user_input: str, session: Optional[ChatSession] = None) -
     """
     llm_client = get_llm_client()
     
-    if session is not None:
-        context = session.get_context_prompt()
+    context = session.get_context_prompt() if session else ""
+    
+    if context:
+        context_section = f"\n## Current State\n{context}\n"
     else:
-        context = ""
+        context_section = ""
     
-    full_context = context.strip() if context else ""
-    context_section = ""
-    if full_context:
-        context_section = f"""
-## Current State
-{full_context}
-
-"""
-    
-    full_prompt = f"{SYSTEM_PROMPT}\n{context_section}\nUser: \"{user_input}\"\nOutput:"
+    full_prompt = f"{SYSTEM_PROMPT}{context_section}\nUser: \"{user_input}\"\nOutput:"
     
     messages = [
-        {"role": "system", "content": "You are a PyMOL command translator. Output only PyMOL commands, one per line, with no explanations."},
+        {"role": "system", "content": SYSTEM_PROMPT.strip()},
         {"role": "user", "content": full_prompt}
     ]
     
     response = llm_client.chat(messages)
     
-    commands = []
-    for line in response.strip().split('\n'):
-        line = line.strip()
-        if line and not line.startswith('#'):
-            commands.append(line)
+    commands = [
+        line.strip() for line in response.strip().split('\n')
+        if line.strip() and not line.strip().startswith('#')
+    ]
     
     return commands
-
-
-def get_current_context(cmd) -> str:
-    """
-    Get current PyMOL context for injection into the translator.
-    
-    Args:
-        cmd: PyMOL command object
-    
-    Returns:
-        String describing current objects and view state
-    """
-    context_lines = []
-    
-    try:
-        names = cmd.get_names()
-        if names and names[0]:
-            objects = names[0]
-            if objects:
-                context_lines.append(f"Loaded objects: {', '.join(objects)}")
-    except Exception:
-        pass
-    
-    try:
-        all_obj = cmd.get_object_list()
-        if all_obj:
-            for obj in all_obj:
-                try:
-                    count = cmd.count_atoms(f"{obj}")
-                    context_lines.append(f"  - {obj}: {count} atoms")
-                except Exception:
-                    context_lines.append(f"  - {obj}")
-    except Exception:
-        pass
-    
-    return "\n".join(context_lines)
