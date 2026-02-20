@@ -1,6 +1,7 @@
 from pymol.Qt import QtWidgets, QtGui, QtCore
 
 from .llm_client import get_llm_client
+from .session import ChatSession
 from . import command_translator
 from . import executor
 from . import screenshot
@@ -16,6 +17,8 @@ class ChatPanel(QtWidgets.QWidget):
         super().__init__(parent)
         self.pymol_instance = pymol_instance
         self.llm_client = get_llm_client()
+        self.session = ChatSession()
+        self._thinking_block_position = None
         self._setup_ui()
 
     def _setup_ui(self):
@@ -52,31 +55,30 @@ class ChatPanel(QtWidgets.QWidget):
     def _process_message(self, user_input: str):
         self.send_button.setEnabled(False)
         self.add_bot_message("Thinking...")
-        self._thinking_cursor = len(self.chat_browser.toPlainText())
+        self._thinking_cursor = self.chat_browser.textCursor()
 
         try:
-            context = ""
             if self.pymol_instance:
-                from pymol import cmd as pymol_cmd
-                context = command_translator.get_current_context(pymol_cmd)
+                self.session.update_from_pymol(self.pymol_instance.cmd)
 
-            commands = command_translator.translate_to_pymol(user_input, context)
+            commands = command_translator.translate_to_pymol(user_input, self.session)
 
             results = []
+            screenshot_bytes = None
             if self.pymol_instance:
-                from pymol import cmd as pymol_cmd
                 for cmd in commands:
-                    output, success = executor.execute_command(cmd, pymol_cmd)
+                    output, success = executor.execute_command(cmd, self.pymol_instance.cmd)
                     results.append({
                         "command": cmd,
                         "output": output,
                         "success": success
                     })
+                    self.session.add_command(cmd, success, output)
 
-                screenshot.capture_screenshot(pymol_cmd)
+                screenshot_bytes = screenshot.capture_screenshot(self.pymol_instance.cmd)
 
             self._remove_thinking_indicator()
-            self._display_results(commands, results)
+            self._display_results(commands, results, screenshot_bytes)
 
         except Exception as e:
             self._remove_thinking_indicator()
@@ -87,11 +89,12 @@ class ChatPanel(QtWidgets.QWidget):
     def _remove_thinking_indicator(self):
         cursor = self.chat_browser.textCursor()
         cursor.movePosition(QtGui.QTextCursor.End)
-        cursor.select(QtGui.QTextCursor.LineUnderCursor)
+        cursor.movePosition(QtGui.QTextCursor.StartOfBlock, QtGui.QTextCursor.KeepAnchor)
         cursor.removeSelectedText()
-        cursor.deleteChar()
+        if not cursor.atEnd():
+            cursor.deleteChar()
 
-    def _display_results(self, commands: list, results: list):
+    def _display_results(self, commands: list, results: list, screenshot_bytes: bytes = None):
         if not commands:
             self.add_bot_message("No commands generated.")
             return
@@ -104,6 +107,9 @@ class ChatPanel(QtWidgets.QWidget):
                 response_lines.append(f"✗ {r['command']}: {r['output']}")
 
         self.add_bot_message("\n".join(response_lines))
+
+        if screenshot_bytes:
+            self._add_screenshot(screenshot_bytes)
 
     def add_user_message(self, text: str):
         self._add_message(text, self.USER_COLOR, alignment=QtCore.Qt.AlignmentFlag.AlignRight)
@@ -132,6 +138,23 @@ class ChatPanel(QtWidgets.QWidget):
         char_format.setForeground(QtGui.QColor(0, 0, 0))
 
         cursor.insertText(text, char_format)
+
+        self.chat_browser.setTextCursor(cursor)
+        self.chat_browser.ensureCursorVisible()
+
+    def _add_screenshot(self, image_bytes: bytes):
+        cursor = self.chat_browser.textCursor()
+        cursor.movePosition(QtGui.QTextCursor.End)
+
+        block_format = QtGui.QTextBlockFormat()
+        block_format.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
+        block_format.setTopMargin(4)
+        block_format.setBottomMargin(4)
+        cursor.insertBlock(block_format)
+
+        qimage = QtGui.QImage.fromData(image_bytes)
+        scaled_image = qimage.scaled(400, 300, QtCore.Qt.AspectRatioMode.KeepAspectRatio, QtCore.Qt.TransformationMode.SmoothTransformation)
+        cursor.insertImage(scaled_image)
 
         self.chat_browser.setTextCursor(cursor)
         self.chat_browser.ensureCursorVisible()
