@@ -5,7 +5,9 @@
  */
 
 #include <algorithm>
+#include <cassert>
 #include <complex>
+#include <cstdint>
 #include <string>
 #include <map>
 #include <set>
@@ -2336,12 +2338,22 @@ public:
   /**
    * @brief Constructor
    * @param datablock The CIF data block containing reflection data
-   * @pre the CIF data block must contain the required reflection arrays
+   * @throws if any of the six required arrays are missing
    */
   ReflnBlock(const pymol::cif_data& datablock)
-      : m_datablock(&datablock)
-      , m_size(datablock.get_arr("_refln.index_h")->size())
+      : m_millerH(datablock.get_arr("_refln.index_h"))
+      , m_millerK(datablock.get_arr("_refln.index_k"))
+      , m_millerL(datablock.get_arr("_refln.index_l"))
+      , m_fwt(datablock.get_arr("_refln.pdbx_fwt"))
+      , m_phwt(datablock.get_arr("_refln.pdbx_phwt"))
+      , m_fom(datablock.get_arr("_refln.fom"))
   {
+    if (!m_millerH || !m_millerK || !m_millerL ||
+        !m_fwt || !m_phwt || !m_fom) {
+      m_size = 0;
+      return;
+    }
+    m_size = m_millerH->size();
   }
 
   /**
@@ -2354,16 +2366,11 @@ public:
     if (index < 0 || index >= m_size) {
       return pymol::make_error("Index out of bounds");
     }
-    auto* millerH = m_datablock->get_arr("_refln.index_h");
-    auto* millerK = m_datablock->get_arr("_refln.index_k");
-    auto* millerL = m_datablock->get_arr("_refln.index_l");
-    auto* fwt = m_datablock->get_arr("_refln.pdbx_fwt");
-    auto* phwt = m_datablock->get_arr("_refln.pdbx_phwt");
-    auto* fom = m_datablock->get_arr("_refln.fom");
 
-    return ReflectionInfo{glm::ivec3(millerH->as_i(index), millerK->as_i(index),
-                              millerL->as_i(index)),
-        fwt->as_f(index), phwt->as_f(index), fom->as_f(index)};
+    return ReflectionInfo{glm::ivec3(m_millerH->as_i(index),
+                              m_millerK->as_i(index),
+                              m_millerL->as_i(index)),
+        m_fwt->as_f(index), m_phwt->as_f(index), m_fom->as_f(index)};
   }
 
   /**
@@ -2372,8 +2379,13 @@ public:
   auto size() const { return m_size; }
 
 private:
-  const pymol::cif_data* m_datablock{};
-  const std::size_t m_size{};
+  const cif_array* m_millerH{};
+  const cif_array* m_millerK{};
+  const cif_array* m_millerL{};
+  const cif_array* m_fwt{};
+  const cif_array* m_phwt{};
+  const cif_array* m_fom{};
+  std::size_t m_size{};
 };
 
 
@@ -2690,7 +2702,7 @@ void ValidateMapVoxelGeometry(const ObjectMapState& ms)
   }
 
   // Manual FracToReal Check vs. GetPointComponent
-  std::cout << "\n--- Manual FracToReal Check vs. GetPointComponent ---\n"
+  std::cout << "\n--- Manual FracToReal Check vs. GetPointComponent ---\n";
   const float* f2r_matrix = ms.Symmetry->Crystal.fracToReal();
   float frac_v_manual[3];
   float manual_cart_vr[3];
@@ -2791,6 +2803,7 @@ ObjectMapState ObjectMapStateFromField(PyMOLGlobals* G,
   transform33f3f(ms.Symmetry->Crystal.fracToReal(), v, ms.ExtentMax);
 
   auto& field = *ms.Field;
+  assert(map.data.size() == field.data->data.size());
   std::copy(map.data.begin(), map.data.end(), field.data->data.begin());
 
   ms.Field->save_points = false;
@@ -3012,7 +3025,7 @@ void ApplySymMatricesToReflections(
     const glm::ivec3& shape,
     float f_amp_weighted, float phase_rad_orig, int recip_1D_total_elements,
     std::complex<float>* flat_recip_data,
-    std::vector<bool>& is_grid_point_set)
+    std::vector<std::uint8_t>& is_grid_point_set)
 {
   for (auto& sym_mat : sym_matrices) {
     glm::ivec3 hkl_symm = glm::round(sym_mat.rot * hkl_orig);
@@ -3079,9 +3092,14 @@ glm::ivec3 CalculateFriedelMateIndex(
  */
 void AddFriedelMate(const glm::ivec3& hkl_orig,
     std::size_t recip_1D_total_elements, const glm::ivec3& shape,
-    std::complex<float>* flat_recip_data, std::vector<bool>& is_grid_point_set)
+    std::complex<float>* flat_recip_data, std::vector<std::uint8_t>& is_grid_point_set)
 {
+  if (!IsHKLWithinShape(hkl_orig, shape))
+    return;
+
   auto flat_idx_hkl = HKLToFlatIndex(hkl_orig, shape);
+  if (flat_idx_hkl >= recip_1D_total_elements)
+    return;
 
   auto idx_bar = CalculateFriedelMateIndex(hkl_orig, shape);
 
@@ -3095,14 +3113,13 @@ void AddFriedelMate(const glm::ivec3& hkl_orig,
       is_grid_point_set[flat_idx_bar] = true;
     }
     // If flat_idx_hkl == flat_idx_bar (centrosymmetric FFT point),
-    // ensure it's real
-    bool centrosymmetric = flat_idx_hkl == flat_idx_bar;
-    if (centrosymmetric) {
+    // ensure it's real by zeroing negligible imaginary parts
+    if (flat_idx_hkl == flat_idx_bar) {
       auto& recip_data = flat_recip_data[flat_idx_hkl];
-      bool around_zero_and_much_less_than_real =
-          std::abs(recip_data.imag()) > 1e-5f * std::abs(recip_data.real()) &&
-          std::abs(recip_data.imag()) > 1e-5f;
-      if (around_zero_and_much_less_than_real) {
+      bool imag_is_negligible =
+          std::abs(recip_data.imag()) < 1e-5f * std::abs(recip_data.real()) ||
+          std::abs(recip_data.imag()) < 1e-5f;
+      if (imag_is_negligible) {
         recip_data.imag(0.0f);
       }
     }
@@ -3133,7 +3150,7 @@ static void PerformFastFourierTransformInPlace(
   }
   auto stride_out = stride_in;
   pocketfft::shape_t axes{2, 1, 0}; // ZYX
-  bool direction = pocketfft::BACKWARD;
+  bool direction = pocketfft::FORWARD;
   float norm = 1.0f;
 
   pocketfft::c2c<float>(pocket_shape, stride_in, stride_out, axes, direction,
@@ -3156,7 +3173,7 @@ CFieldTyped<float> FourierTransformStructureFactorsToMap(PyMOLGlobals* G,
   CFieldTyped<std::complex<float>> recip_grid(glm::value_ptr(shape), 3);
 
   auto recip_1D_total_elements = shape[0] * shape[1] * shape[2];
-  std::vector<bool> is_grid_point_set(recip_1D_total_elements, false);
+  std::vector<std::uint8_t> is_grid_point_set(recip_1D_total_elements, 0);
 
   auto* flat_recip_data = recip_grid.ptr(0, 0, 0);
 
@@ -3181,7 +3198,6 @@ CFieldTyped<float> FourierTransformStructureFactorsToMap(PyMOLGlobals* G,
     }
 
     auto phase_rad_orig = glm::radians(ph_deg_orig);
-    auto F_orig_complex = std::polar(f_amp_weighted, phase_rad_orig);
 
     ApplySymMatricesToReflections(
         sym_matrices, hkl_orig, shape, f_amp_weighted, phase_rad_orig,
@@ -3213,21 +3229,32 @@ CFieldTyped<float> FourierTransformStructureFactorsToMap(PyMOLGlobals* G,
 pymol::Result<ObjectMap*> ObjectMapReadCifStr(
     PyMOLGlobals* G, const pymol::cif_data& datablock)
 {
-  auto I = new ObjectMap(G);
+  // Validate required arrays before proceeding
+  if (!datablock.get_arr("_refln.pdbx_fwt") ||
+      !datablock.get_arr("_refln.pdbx_phwt")) {
+    return pymol::make_error(
+        "CIF reflection data missing required map coefficients "
+        "(_refln.pdbx_FWT / _refln.pdbx_PHWT)");
+  }
+
+  auto I = std::make_unique<ObjectMap>(G);
   initializeTTT44f(I->TTT);
   I->TTTFlag = false;
 
   ReflnBlock refln_block(datablock);
   std::unique_ptr<CSymmetry> sym(read_symmetry(G, &datablock));
+  if (!sym) {
+    return pymol::make_error("CIF reflection data missing symmetry/cell parameters");
+  }
 
   auto reciprocal_space_params = CalculateReciprocalSpaceParam(sym->Crystal);
   auto map = FourierTransformStructureFactorsToMap(
       G, *sym, refln_block, reciprocal_space_params);
 
   I->State.push_back(ObjectMapStateFromField(G, map, std::move(sym)));
-  ObjectMapUpdateExtents(I);
+  ObjectMapUpdateExtents(I.get());
 
-  return I;
+  return I.release();
 }
 
 /**
