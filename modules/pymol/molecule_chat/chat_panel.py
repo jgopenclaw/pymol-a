@@ -1,5 +1,10 @@
 from pymol.Qt import QtWidgets, QtGui, QtCore
 
+from .llm_client import get_llm_client
+from . import command_translator
+from . import executor
+from . import screenshot
+
 
 class ChatPanel(QtWidgets.QWidget):
 
@@ -10,6 +15,7 @@ class ChatPanel(QtWidgets.QWidget):
     def __init__(self, parent=None, pymol_instance=None):
         super().__init__(parent)
         self.pymol_instance = pymol_instance
+        self.llm_client = get_llm_client()
         self._setup_ui()
 
     def _setup_ui(self):
@@ -40,8 +46,64 @@ class ChatPanel(QtWidgets.QWidget):
         text = self.input_edit.text().strip()
         if text:
             self.input_edit.clear()
-            if hasattr(self, '_on_message_sent'):
-                self._on_message_sent(text)
+            self.add_user_message(text)
+            self._process_message(text)
+
+    def _process_message(self, user_input: str):
+        self.send_button.setEnabled(False)
+        self.add_bot_message("Thinking...")
+        self._thinking_cursor = len(self.chat_browser.toPlainText())
+
+        try:
+            context = ""
+            if self.pymol_instance:
+                from pymol import cmd as pymol_cmd
+                context = command_translator.get_current_context(pymol_cmd)
+
+            commands = command_translator.translate_to_pymol(user_input, context)
+
+            results = []
+            if self.pymol_instance:
+                from pymol import cmd as pymol_cmd
+                for cmd in commands:
+                    output, success = executor.execute_command(cmd, pymol_cmd)
+                    results.append({
+                        "command": cmd,
+                        "output": output,
+                        "success": success
+                    })
+
+                screenshot.capture_screenshot(pymol_cmd)
+
+            self._remove_thinking_indicator()
+            self._display_results(commands, results)
+
+        except Exception as e:
+            self._remove_thinking_indicator()
+            self.add_error_message(f"Error: {str(e)}")
+        finally:
+            self.send_button.setEnabled(True)
+
+    def _remove_thinking_indicator(self):
+        cursor = self.chat_browser.textCursor()
+        cursor.movePosition(QtGui.QTextCursor.End)
+        cursor.select(QtGui.QTextCursor.LineUnderCursor)
+        cursor.removeSelectedText()
+        cursor.deleteChar()
+
+    def _display_results(self, commands: list, results: list):
+        if not commands:
+            self.add_bot_message("No commands generated.")
+            return
+
+        response_lines = []
+        for r in results:
+            if r["success"]:
+                response_lines.append(f"✓ {r['command']}")
+            else:
+                response_lines.append(f"✗ {r['command']}: {r['output']}")
+
+        self.add_bot_message("\n".join(response_lines))
 
     def add_user_message(self, text: str):
         self._add_message(text, self.USER_COLOR, alignment=QtCore.Qt.AlignmentFlag.AlignRight)

@@ -4,6 +4,15 @@ MoleculeChat Plugin
 A PyMOL plugin for molecular visualization and chat interaction.
 '''
 
+from . import chat_panel
+from . import command_translator
+from . import executor
+from . import screenshot
+from . import llm_client
+from . import config
+
+__all__ = ['chat_panel', 'command_translator', 'executor', 'screenshot', 'llm_client', 'config']
+
 __plugin_name__ = 'MoleculeChat'
 __plugin_author__ = 'MoleculeChat Team'
 __plugin_version__ = '0.1.0'
