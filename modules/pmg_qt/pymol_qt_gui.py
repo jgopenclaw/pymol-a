@@ -396,6 +396,9 @@ PyMOL> color ye<TAB>    (will autocomplete "yellow")
         # legacy plugin system
         self.menudict['Plugin'].addAction(
             'Initialize Plugin System', self.initializePlugins)
+        self.menudict['Plugin'].addAction(
+            'MoleculeChat', self.open_chat_panel).setShortcut(
+            QtGui.QKeySequence('Ctrl+M'))
 
         # focus in command line
         if options.external_gui:
@@ -621,6 +624,15 @@ PyMOL> color ye<TAB>    (will autocomplete "yellow")
 
         self.builder.show()
         self.builder.raise_()
+
+    def open_chat_panel(self):
+        from pymol.molecule_chat.chat_panel import ChatPanel
+
+        if not hasattr(self, 'chat_panel'):
+            self.chat_panel = ChatPanel(self, self.pymolwidget.pymol)
+            self.addDockWidget(Qt.RightDockWidgetArea, self.chat_panel)
+        self.chat_panel.show()
+        self.chat_panel.raise_()
 
     def open_props_dialog(self):
         from .properties_dialog import PropsDialog
